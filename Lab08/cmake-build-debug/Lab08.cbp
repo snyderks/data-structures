@@ -85,6 +85,12 @@
 		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab08/OrderedLinkedList.h">
 			<Option target="Lab08"/>
 		</Unit>
+		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab08/Student.cpp">
+			<Option target="Lab08"/>
+		</Unit>
+		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab08/Student.h">
+			<Option target="Lab08"/>
+		</Unit>
 		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab08/main.cpp">
 			<Option target="Lab08"/>
 		</Unit>
