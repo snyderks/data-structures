@@ -5,11 +5,13 @@
 #ifndef LAB10_NODE_H
 #define LAB10_NODE_H
 
+#include <vector>
+
 template <class T>
 class Node {
 public:
-    T** items;
-    Node** children;
+    std::vector<T*> items;
+    std::vector<Node<T>*> children;
     int MaxKeys;
     int MaxChildren;
     int Keys;
@@ -26,7 +28,13 @@ public:
 
     void AppendKey(T* item);
 
+    void InsertKey(T *item);
+
     void AppendChild(Node* item);
+
+    void InsertChild(Node<T>* item, int pos);
+
+    void ReplaceChild(Node<T>* item, int pos);
 
     T* RemoveKeyFromLeaf(T* item);
 
@@ -39,26 +47,18 @@ Node<T>::Node(int maxItems) {
     MaxChildren = maxItems;
     Keys = 0;
     ChildNodes = 0;
-    items = new T*[MaxKeys];
-    for (int i = 0; i < MaxKeys; i++) {
-        items[i] = nullptr;
-    }
-    children = new Node<T>*[MaxChildren];
-    for (int i = 0; i < MaxChildren; i++) {
-        children[i] = nullptr;
-    }
+    items = std::vector<T*>();
+    children = std::vector<Node<T>*>();
 }
 
 template <class T>
 Node<T>::~Node() {
-    delete items;
-    items = nullptr;
 }
 
 template <class T>
 int Node<T>::FindChildrenIndex(T *item) {
     int i = 0;
-    while (i < Keys && *item > *items[i]) {
+    while (i < Keys && *item > *items.at(i)) {
         i++;
     }
     return i;
@@ -66,18 +66,13 @@ int Node<T>::FindChildrenIndex(T *item) {
 
 template <class T>
 bool Node<T>::IsLeaf() {
-    for (int i = 0; i < Keys + 1; i++) {
-        if (children[i] != nullptr) {
-            return false;
-        }
-    }
-    return true;
+    return children.size() <= 0;
 }
 
 template <class T>
 void Node<T>::AppendKey(T *item) {
     if (Keys < MaxKeys && item != nullptr) {
-        items[Keys] = item;
+        items.push_back(item);
         Keys++;
     } else if (Keys >= MaxKeys) {
         throw;
@@ -85,9 +80,28 @@ void Node<T>::AppendKey(T *item) {
 }
 
 template <class T>
+void Node<T>::InsertKey(T *item) {
+    items.insert(items.begin()+FindChildrenIndex(item), item);
+    Keys++;
+}
+
+template <class T>
+void Node<T>::InsertChild(Node<T>* item, int pos) {
+    children.insert(children.begin()+pos, item);
+    ChildNodes++;
+}
+
+template <class T>
+void Node<T>::ReplaceChild(Node<T> *item, int pos) {
+    // erase first so the vector destroys that item
+    children.erase(children.begin() + pos);
+    children.insert(children.begin()+pos, item);
+}
+
+template <class T>
 void Node<T>::AppendChild(Node *item) {
     if (ChildNodes < MaxChildren && item != nullptr) {
-        children[ChildNodes] = item;
+        children.push_back(item);
         ChildNodes++;
     } else if (ChildNodes >= MaxChildren) {
         throw;
@@ -97,12 +111,13 @@ void Node<T>::AppendChild(Node *item) {
 template <class T>
 T* Node<T>::RemoveKeyFromLeaf(T* key) {
     for (int i = 0; i < Keys; i++) {
-        if (*items[i] == *key) {
-            T *temp = items[i];
+        if (*items.at(i) == *key) {
+            T *temp = items.at(i);
             // collapse the keys
             for (int j = i; j < Keys; j++) {
-                items[j] = items[j + 1];
+                items.at(j) = items.at(j + 1);
             }
+            items.pop_back();
             Keys--;
             return temp;
         }
@@ -113,7 +128,7 @@ T* Node<T>::RemoveKeyFromLeaf(T* key) {
 template <class T>
 int Node<T>::FindKey(T* key) {
     for (int i = 0; i < Keys; i++) {
-        if (*items[i] == *key) {
+        if (*items.at(i) == *key) {
             return i;
         }
     }

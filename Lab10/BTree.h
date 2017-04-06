@@ -6,6 +6,8 @@
 #define LAB10_BTREE_H
 
 #include <cmath>
+#include <memory>
+#include <vector>
 
 template <class T>
 class Split {
@@ -31,8 +33,11 @@ private:
     T* removeItemHelper(T* item, Node<T>* subtree);
 
     void printSubtree(Node<T> *subtree, int indentLevel);
+
+    void emptyTreeHelper(Node<T>* subtree);
 public:
     BTree(int degree = 3);
+    ~BTree();
 
     /// \brief InsertItem adds an item to the BTree in the correct position.
     void InsertItem(T* item);
@@ -49,27 +54,20 @@ BTree<T>::BTree(int degree) {
 }
 
 template <class T>
+BTree<T>::~BTree() {
+    emptyTreeHelper(root);
+    delete root;
+}
+
+template <class T>
 Split<T> BTree<T>::insertItemHelper(T *item, Node<T>* subtree) {
     // check if it is a leaf
     if (subtree->IsLeaf()) {
 
         // check if it's full
         if (subtree->Keys < subtree->MaxKeys) {
-            // find the place to insert
-            auto indexToInsert = subtree->FindChildrenIndex(item);
-
-            if (indexToInsert < subtree->Keys) {
-                // make a spot
-                for (int i = subtree->Keys; i > indexToInsert; i--) {
-                    subtree->items[i] = subtree->items[i - 1];
-                    // offset by 1 for the children
-                    subtree->children[i + 1] = subtree->children[i];
-                }
-            }
-
             // insert in correct place
-            subtree->items[indexToInsert] = item;
-            subtree->Keys++;
+            subtree->InsertKey(item);
 
             // no split necessary, so return empty split
             return Split<T>();
@@ -92,21 +90,20 @@ Split<T> BTree<T>::insertItemHelper(T *item, Node<T>* subtree) {
         }
     } else {
         // recurse until we reach a leaf
-        auto childUsed = subtree->FindChildrenIndex(item);
-        auto result = insertItemHelper(item, subtree->children[childUsed]);
+        int childUsed = subtree->FindChildrenIndex(item);
+        Split<T> result = Split<T>();
+        if (subtree->ChildNodes > childUsed) {
+            result = insertItemHelper(item, subtree->children.at(childUsed));
+        }
         // see if we need to split this node
         if (result.rhs != nullptr) {
             // must split if currently full
-            if(subtree->Keys == subtree->MaxKeys) {
+            if(subtree->Keys >= subtree->MaxKeys) {
                 auto results = addAndSplit(result.separator, result.lhs, result.rhs,
                                            subtree->FindChildrenIndex(result.separator), subtree);
                 // empty the keys and children of the subtree temporarily
-                for (int i = 0; i < subtree->MaxKeys; i++) {
-                    subtree->items[i] = nullptr;
-                    subtree->children[i] = nullptr;
-                }
-                // still need to empty the last location
-                subtree->children[subtree->MaxChildren-1] = nullptr;
+                subtree->items.clear();
+                subtree->children.clear();
 
                 // zero out the counts
                 subtree->Keys = 0;
@@ -117,19 +114,10 @@ Split<T> BTree<T>::insertItemHelper(T *item, Node<T>* subtree) {
                 subtree->AppendChild(results.rhs);
                 subtree->AppendKey(results.separator);
             } else {
-                // no need to split, so make a space for both the new children
-                // and the new key
-                for (int i = subtree->Keys; i > childUsed; i--) {
-                    subtree->items[i] = subtree->items[i - 1];
-                    // offset by 1 for the children
-                    subtree->children[i + 1] = subtree->children[i];
-                }
-                subtree->children[childUsed]  = result.lhs;
-                subtree->children[childUsed + 1] = result.rhs;
-                subtree->items[childUsed] = result.separator;
-                // need to increment keys
-                subtree->Keys++;
-                subtree->ChildNodes++;
+                // no need to split
+                subtree->ReplaceChild(result.lhs, childUsed);
+                subtree->InsertChild(result.rhs, childUsed + 1);
+                subtree->InsertKey(result.separator);
                 return Split<T>();
             }
         }
@@ -145,15 +133,15 @@ void BTree<T>::InsertItem(T *item) {
 template <class T>
 Split<T> BTree<T>::splitList(T *item, Node<T> *subtree) {
     // make a new array with all the items in it
-    T** arr = new T*[subtree->MaxKeys + 1];
+    std::vector<T*> arr = std::vector<T*>();
     int i = 0;
     int itemsIndex = 0;
     int indexToInsertItem = subtree->FindChildrenIndex(item);
     while (i < subtree->MaxKeys + 1) {
         if (i == indexToInsertItem) {
-            arr[i] = item;
+            arr.push_back(item);
         } else {
-            arr[i] = subtree->items[itemsIndex];
+            arr.push_back(subtree->items.at(itemsIndex));
             itemsIndex++;
         }
         i++;
@@ -170,48 +158,55 @@ Split<T> BTree<T>::splitList(T *item, Node<T> *subtree) {
         // if on the left of the median
         if (j < median) {
             // append the keys and children to that node
-            left->AppendKey(arr[j]);
-            left->AppendChild(subtree->children[j]);
+            left->AppendKey(arr.at(j));
         } else if (j > median) {
-            right->AppendChild(subtree->children[j]);
             // keys greater than the median go right
-            right->AppendKey(arr[j]);
+            right->AppendKey(arr.at(j));
+        }
+    }
+
+    // match up the children with the keys on the correct side
+    for (int j = 0; j < subtree->ChildNodes; j++) {
+        if (j < median) {
+            left->AppendChild(subtree->children.at(j));
+        } else if (j > median) {
+            right->AppendChild(subtree->children.at(j));
         } else {
             // special case: children with the same index go to the left.
-            left->AppendChild(subtree->children[j]);
+            left->AppendChild(subtree->children.at(j));
         }
     }
     // return the nodes to use and the median to put in the parent node
-    return Split<T>(left, right, arr[median]);
+    return Split<T>(left, right, arr.at(median));
 }
 
 template<class T>
 Split<T> BTree<T>::addAndSplit(T *item, Node<T>* left, Node<T>* right, int index, Node<T> *subtree) {
-    // make a new array with all the items in it, but with a length 1 larger.
-    T** keys = new T*[subtree->MaxKeys + 1];
+    // make a new array with all the items in it
+    std::vector<T*> keys = std::vector<T*>();
     // fill the keys with the old array and the new spot.
     int itemsIndex = 0; // the position to add from the subtree
     for (int i = 0; i < subtree->MaxKeys + 1; i++) {
         if (i == index) {
-            keys[i] = item;
+            keys.push_back(item);
         } else {
-            keys[i] = subtree->items[itemsIndex];
+            keys.push_back(subtree->items.at(itemsIndex));
             itemsIndex++;
         }
     }
 
     // make a new array with all the children in it, but with a length 1 larger.
-    Node<T>** children = new Node<T>*[subtree->MaxChildren + 1];
+    std::vector<Node<T>*>children = std::vector<Node<T>*>();
     int childIndex = 0;
     for (int i = 0; i < subtree->MaxChildren + 1; i++) {
         if (i == index) {
-            children[i] = left;
+            children.push_back(left);
             // need to skip the original child there
             childIndex++;
         } else if (i == index + 1) {
-            children[i] = right;
+            children.push_back(right);
         } else {
-            children[i] = subtree->children[childIndex];
+            children.push_back(subtree->children.at(childIndex));
             childIndex++;
         }
     }
@@ -222,18 +217,26 @@ Split<T> BTree<T>::addAndSplit(T *item, Node<T>* left, Node<T>* right, int index
     int median = subtree->MaxChildren / 2;
 
     // add elements to the sides
-    for (int i = 0; i < subtree->MaxChildren + 1; i++) {
+    for (int i = 0; i < subtree->MaxChildren; i++) {
         if (i < median) {
-            lhs->AppendKey(keys[i]);
-            lhs->AppendChild(children[i]);
+            lhs->AppendKey(keys.at(i));
         } else if (i > median) {
-            rhs->AppendChild(children[i]);
-            rhs->AppendKey(keys[i]);
-        } else {
-            // children with the same index go to the left.
-            lhs->AppendChild(children[i]);
+            rhs->AppendKey(keys.at(i));
         }
     }
+
+    // move children to correct spots
+    for (int i = 0; i < subtree->ChildNodes; i++) {
+        if (i < median) {
+            lhs->AppendChild(children.at(i));
+        } else if (i > median) {
+            rhs->AppendChild(children.at(i));
+        } else {
+            // children with the same index go to the left.
+            lhs->AppendChild(children.at(i));
+        }
+    }
+
     return Split<T>(lhs, rhs, keys[median]);
 }
 
@@ -274,13 +277,31 @@ void BTree<T>::printSubtree(Node<T> *subtree, int indentLevel) {
         return;
     }
     for (int i = 0; i < subtree->Keys; i++) {
-        printSubtree(subtree->children[i], indentLevel + 2);
+        if (i < subtree->ChildNodes) {
+            printSubtree(subtree->children.at(i), indentLevel + 2);
+        }
         for (int j = 0; j < indentLevel; j++) {
             std::cout << " ";
         }
-        std::cout << *subtree->items[i] << std::endl;
+        std::cout << *subtree->items.at(i) << std::endl;
     }
-    printSubtree(subtree->children[subtree->Keys], indentLevel + 2);
+    if (subtree->Keys < subtree->ChildNodes) {
+        printSubtree(subtree->children.at(subtree->Keys), indentLevel + 2);
+    }
+}
+
+template<class T>
+void BTree<T>::emptyTreeHelper(Node<T>* subtree) {
+    for (int i = 0; i < subtree->Keys; i++) {
+        delete subtree->items[i];
+        subtree->items[i] = nullptr;
+    }
+
+    for (int i = 0; i < subtree->ChildNodes; i++) {
+        emptyTreeHelper(subtree->children[i]);
+        delete subtree->children[i];
+        subtree->children[i] = nullptr;
+    }
 }
 
 

@@ -8,18 +8,27 @@ int main() {
     tree->InsertItem(new int(3));
     tree->InsertItem(new int(1));
     tree->InsertItem(new int(4));
+    tree->PrintTree();
     tree->InsertItem(new int(10));
+    tree->PrintTree();
     tree->InsertItem(new int(5));
+    tree->PrintTree();
     tree->InsertItem(new int(6));
+    tree->PrintTree();
     tree->InsertItem(new int(2));
+    tree->PrintTree();
     tree->InsertItem(new int(12));
+    tree->PrintTree();
     tree->InsertItem(new int(8));
+    tree->PrintTree();
     tree->InsertItem(new int(9));
 
-    tree->RemoveItem(new int(12));
-    tree->RemoveItem(new int(1));
+//    tree->RemoveItem(new int(12));
+//    tree->RemoveItem(new int(1));
 
     tree->PrintTree();
+
+    delete tree;
 
     return 0;
 }
