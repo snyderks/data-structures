@@ -88,6 +88,12 @@
 		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab10/Node.h">
 			<Option target="Lab10"/>
 		</Unit>
+		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab10/Student.cpp">
+			<Option target="Lab10"/>
+		</Unit>
+		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab10/Student.h">
+			<Option target="Lab10"/>
+		</Unit>
 		<Unit filename="/Users/kristian/Development/cpp/datastructures/Lab10/main.cpp">
 			<Option target="Lab10"/>
 		</Unit>

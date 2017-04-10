@@ -260,9 +260,9 @@ Operation selectOperation() {
     }
 }
 
-int getIndexFromUser() {
+int getNumberFromUser() {
     while (true) {
-        std::cout << std::endl << "Please enter an index: " << std::endl;
+        std::cout << std::endl << "Please enter a number: " << std::endl;
         std::string input;
         getline(std::cin, input);
         try {
